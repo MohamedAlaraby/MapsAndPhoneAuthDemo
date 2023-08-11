@@ -1,6 +1,10 @@
 import 'package:first_project/constants/my_strings.dart';
 import 'package:first_project/presentation/widgets/custom_form_field.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+import '../../business_logic/phone_auth/phone_auth_cubit.dart';
+import '../../business_logic/phone_auth/phone_auth_states.dart';
 
 // ignore: must_be_immutable
 class LoginScreen extends StatelessWidget {
@@ -42,6 +46,7 @@ class LoginScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 70),
                   _buildNextButton(context),
+                  _buildPhoneNumberSubmitedBloc(),
                 ],
               ),
             ),
@@ -51,12 +56,68 @@ class LoginScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildPhoneNumberSubmitedBloc() {
+    //like the BlocConsumer
+    //since i will only naviagte so i don't need to rebuild anything ,
+    //so i should use bloc listener not the bloc builder,
+    return BlocListener<PhoneAuthCubit, PhoneAuthStates>(
+      child: Container(),
+      listenWhen: (previous, current) {
+        return previous != current;
+      },
+      listener: (context, state) {
+        if (state is PhoneAuthLoadingState) {
+          _showProgressIndicator(context);
+        }
+        if (state is PhoneAuthSubmitedSuccessState) {
+          Navigator.pop(context);
+          Navigator.pushNamed(
+            context,
+            otpScreen,
+            arguments: phoneNumber,
+          );
+        }
+        if (state is PhoneAuthErrorState) {
+          Navigator.pop(context);
+          String error = state.error;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(error, style: const TextStyle(color: Colors.white)),
+              duration: const Duration(seconds: 5),
+              backgroundColor: Colors.black,
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  //just to customize the circluler progress indicator.
+  void _showProgressIndicator(context) {
+    AlertDialog alertDialog = const AlertDialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      content: Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+        ),
+      ),
+    );
+    showDialog(
+      barrierColor: Colors.white.withOpacity(0),
+      barrierDismissible: false,
+      context: context,
+      builder: (context) => alertDialog,
+    );
+  }
+
   Widget _buildNextButton(BuildContext context) {
     return Align(
       alignment: AlignmentDirectional.centerEnd,
       child: ElevatedButton(
         onPressed: () {
-          Navigator.pushNamed(context, otpScreen);
+          _showProgressIndicator(context);
+          _register(context);
         },
         style: ElevatedButton.styleFrom(
           minimumSize: const Size(110, 50),
@@ -103,5 +164,18 @@ class LoginScreen extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Future<void> _register(BuildContext context) async {
+    if (!_phoneFormKey.currentState!.validate()) {
+      //the fields not valdate.
+      Navigator.pop(context);
+      return;
+    } else {
+      Navigator.pop(context);
+      _phoneFormKey.currentState!.save(); //to save the phone number.
+      BlocProvider.of<PhoneAuthCubit>(context)
+          .submitPhoneNumber(phoneNumber: phoneNumber!);
+    }
   }
 }
