@@ -1,4 +1,4 @@
-import 'package:first_project/constants/my_colors.dart';
+import '../../constants/my_colors.dart';
 import 'package:flutter/material.dart';
 
 // ignore: must_be_immutable

@@ -1,5 +1,5 @@
-import 'package:first_project/constants/my_strings.dart';
-import 'package:first_project/presentation/widgets/custom_form_field.dart';
+import '../../constants/my_strings.dart';
+import '../widgets/custom_form_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 

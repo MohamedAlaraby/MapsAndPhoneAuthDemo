@@ -1,7 +1,7 @@
-import 'package:first_project/business_logic/phone_auth/phone_auth_cubit.dart';
-import 'package:first_project/business_logic/phone_auth/phone_auth_states.dart';
-import 'package:first_project/constants/my_colors.dart';
-import 'package:first_project/constants/my_strings.dart';
+import '../../business_logic/phone_auth/phone_auth_cubit.dart';
+import '../../business_logic/phone_auth/phone_auth_states.dart';
+import '../../constants/my_colors.dart';
+import '../../constants/my_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';

@@ -1,6 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:first_project/app_router.dart';
-import 'package:first_project/constants/my_strings.dart';
+import 'app_router.dart';
+import 'constants/my_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 

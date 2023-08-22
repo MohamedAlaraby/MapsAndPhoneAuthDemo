@@ -1,7 +1,9 @@
 // ignore_for_file: public_member_api_docs, sort_constructors_first
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:maps/data/models/place_direction.dart';
 import 'package:maps/data/models/place_location.dart';
 import 'package:maps/data/models/place_suggestion.dart';
-import 'package:maps/data/web_services/place_suggestion_webservices.dart';
+import 'package:maps/data/web_services/maps_webservices.dart';
 
 class SuggestionsRepository {
   late PlaceSuggestionWebServices suggestionsWebService;
@@ -29,5 +31,16 @@ class SuggestionsRepository {
     );
 
     return PlaceLocation.fromJson(placeLocation);
+  }
+
+  Future<PlaceDirection> getDirection({
+    required LatLng origin,
+    required LatLng destination,
+  }) async {
+    final directions = await suggestionsWebService.getDirection(
+      origin: origin,
+      destination: destination,
+    );
+    return PlaceDirection.fromJson(directions);
   }
 }

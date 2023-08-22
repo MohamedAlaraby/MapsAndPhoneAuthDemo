@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'package:maps/data/models/place_direction.dart';
+import 'package:maps/presentation/widgets/distance_and_time.dart';
+
 import '../../business_logic/phone_auth/phone_auth_cubit.dart';
 import '../../business_logic/maps/maps_cubit.dart';
 import '../../constants/my_colors.dart';
@@ -17,8 +20,7 @@ import '../widgets/custom_progress_indicator.dart';
 
 // ignore: must_be_immutable
 class MapScreen extends StatefulWidget {
-  MapScreen({super.key});
-
+  const MapScreen({super.key});
   @override
   State<MapScreen> createState() => _MapScreenState();
 }
@@ -33,30 +35,38 @@ class _MapScreenState extends State<MapScreen> {
     target: LatLng(position!.latitude, position!.longitude),
     tilt: 0.0,
     bearing: 0.0,
-    zoom: 17,
+    zoom: 13,
   );
   final Completer<GoogleMapController> _mapController = Completer();
-  //These variables for getting the clicked place location
-  Set<Marker> markers = Set();
+  //These variables for getting the clicked place location.
+  Set<Marker> markers = {};
   late PlaceSuggestion placeSuggestion;
   late PlaceLocation selectedPlace;
   late Marker searchedPlaceMarker;
+  late Marker currentLocationMarker;
   late CameraPosition newCameraPosition;
-
-  void _buildCameraNewPosition() {
-    newCameraPosition = CameraPosition(
-      target: LatLng(
-        selectedPlace.result.geometry.location.lat,
-        selectedPlace.result.geometry.location.lat,
-      ),
-      zoom: 13,
-    );
-  }
+  //These variables for getting the clicked place direction.
+  PlaceDirection? placeDirection;
+  var progressndicator = false;
+  List<LatLng> polylinePoints = [];
+  var isSearchedPlaceMarkerClicked = false;
+  var isTimeAndDistanceVisible = false;
+  late String time;
+  late String distance;
 
   @override
   void initState() {
     super.initState();
     getCurrentLocation();
+  }
+
+  Future<void> getCurrentLocation() async {
+    await LocationHelper.getCurrentLocation();
+    position = await Geolocator.getLastKnownPosition().whenComplete(
+      () {
+        setState(() {});
+      },
+    );
   }
 
   @override
@@ -69,6 +79,12 @@ class _MapScreenState extends State<MapScreen> {
         children: [
           position != null ? _buildGoogleMap() : const CustomProgrssIndicator(),
           _buildSearchBar(),
+          isSearchedPlaceMarkerClicked == true
+              ? DistanceAndTime(
+                  isTimeAndDistanceVisible: isTimeAndDistanceVisible,
+                  placeDirection: placeDirection,
+                )
+              : Container(),
         ],
       ),
       floatingActionButton: Container(
@@ -88,13 +104,6 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  Future<void> getCurrentLocation() async {
-    await LocationHelper.getCurrentLocation();
-    position = await Geolocator.getLastKnownPosition().whenComplete(() {
-      setState(() {});
-    });
-  }
-
   Widget _buildGoogleMap() {
     return GoogleMap(
       initialCameraPosition: _myCurrentLocationCameraPosition,
@@ -106,6 +115,16 @@ class _MapScreenState extends State<MapScreen> {
       onMapCreated: (GoogleMapController controller) {
         _mapController.complete(controller);
       },
+      polylines: isSearchedPlaceMarkerClicked == true
+          ? {
+              Polyline(
+                polylineId: const PolylineId("my_polyline"),
+                color: Colors.black,
+                width: 3,
+                points: polylinePoints,
+              ),
+            }
+          : {},
     );
   }
 
@@ -131,6 +150,7 @@ class _MapScreenState extends State<MapScreen> {
             children: [
               _buildSuggestionsBloc(),
               _buildSelectedPlaceLocationBloc(),
+              _buildDirectionsBloc(),
             ],
           ),
         );
@@ -151,11 +171,19 @@ class _MapScreenState extends State<MapScreen> {
       axisAlignment: isPortrait ? 0.0 : -1.0,
       openAxisAlignment: 0.0,
       width: isPortrait ? 600 : 1000,
+      progress: progressndicator,
       debounceDelay: const Duration(milliseconds: 500),
       onQueryChanged: (query) {
         _getSuggestedPlaces(query: query);
       },
-      onFocusChanged: (_) {},
+      onFocusChanged: (_) {
+        //Hide the distance and time when searching for a new place.
+
+        setState(() {
+          isTimeAndDistanceVisible = false;
+          isSearchedPlaceMarkerClicked = false;
+        });
+      },
       actions: [
         FloatingSearchBarAction(
           showIfOpened: false,
@@ -199,6 +227,12 @@ class _MapScreenState extends State<MapScreen> {
             //To close the listview widget.
             controller.close();
             _getSelectedPlaceLocation();
+            if (polylinePoints.isNotEmpty) {
+              polylinePoints.clear();
+            }
+            if (markers.isNotEmpty) {
+              removeAllMarkersAndUpdateUi();
+            }
           },
           child: CustomPlacesListItem(
             place: places[index],
@@ -235,10 +269,37 @@ class _MapScreenState extends State<MapScreen> {
         if (state is PlaceLocationLoaded) {
           selectedPlace = state.placeLocation;
           _goToTheSearchedPlace();
+          _getDirections();
         }
       },
       child: Container(),
     );
+  }
+
+  Widget _buildDirectionsBloc() {
+    //We should use the bloc listener if we will not build new component on the screen.
+    return BlocListener<MapsCubit, MapsState>(
+      listener: (context, state) {
+        if (state is PlaceDirectionLoaded) {
+          setState(() {
+            placeDirection = (state).placeDirection;
+          });
+          _getPolylinePoints();
+        }
+      },
+      child: Container(),
+    );
+  }
+
+  void _getPolylinePoints() {
+    polylinePoints = placeDirection!.polylinePoints
+        .map(
+          (polylinePoint) => LatLng(
+            polylinePoint.latitude,
+            polylinePoint.longitude,
+          ),
+        )
+        .toList();
   }
 
   Future<void> _goToTheSearchedPlace() async {
@@ -248,15 +309,70 @@ class _MapScreenState extends State<MapScreen> {
     _buildSearchedPlaceMarker();
   }
 
+  void _buildCameraNewPosition() {
+    newCameraPosition = CameraPosition(
+      tilt: 0.0,
+      bearing: 0.0,
+      target: LatLng(
+        selectedPlace.result.geometry.location.lat,
+        selectedPlace.result.geometry.location.lng,
+      ),
+      zoom: 13,
+    );
+  }
+
   void _buildSearchedPlaceMarker() {
     searchedPlaceMarker = Marker(
       position: newCameraPosition.target,
       markerId: const MarkerId("1"),
       onTap: () {
         _buildCurrentLocationMarker();
+
+        setState(() {
+          isSearchedPlaceMarkerClicked = true;
+          isTimeAndDistanceVisible = true;
+        });
       },
+      infoWindow: InfoWindow(title: placeSuggestion.description),
+      icon: BitmapDescriptor.defaultMarkerWithHue(
+        BitmapDescriptor.hueRed,
+      ),
+    );
+    _appendToMarkersAndUpdateUi(searchedPlaceMarker);
+  }
+
+  void _buildCurrentLocationMarker() {
+    currentLocationMarker = Marker(
+      position: LatLng(position!.latitude, position!.longitude),
+      markerId: const MarkerId("2"),
+      onTap: () {},
+      infoWindow: const InfoWindow(title: "Your current location"),
+      icon: BitmapDescriptor.defaultMarkerWithHue(
+        BitmapDescriptor.hueBlue,
+      ),
+    );
+    _appendToMarkersAndUpdateUi(currentLocationMarker);
+  }
+
+  void _appendToMarkersAndUpdateUi(Marker marker) {
+    setState(() {
+      markers.add(marker);
+    });
+  }
+
+  void _getDirections() {
+    BlocProvider.of<MapsCubit>(context).getPlaceDirection(
+      origin: LatLng(position!.latitude, position!.longitude),
+      destinaton: LatLng(
+        selectedPlace.result.geometry.location.lat,
+        selectedPlace.result.geometry.location.lng,
+      ),
     );
   }
 
-  void _buildCurrentLocationMarker() {}
+  void removeAllMarkersAndUpdateUi() {
+    setState(() {
+      markers.clear();
+    });
+  }
 }

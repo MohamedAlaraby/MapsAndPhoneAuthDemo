@@ -1,6 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:first_project/business_logic/phone_auth/phone_auth_states.dart';
-
+import 'phone_auth_states.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 class PhoneAuthCubit extends Cubit<PhoneAuthStates> {
